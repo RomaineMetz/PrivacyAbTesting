@@ -1,0 +1,1074 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Privacy A/B Testing Platform</title>
+    <script src="https://cdn.jsdelivr.net/npm/ethers@5.7.2/dist/ethers.umd.min.js"></script>
+    <script src="https://unpkg.com/fhevmjs@0.5.0/bundle/index.web.js"></script>
+    <script>
+        // Ensure ethers is available globally after load
+        document.addEventListener('DOMContentLoaded', function() {
+            if (typeof ethers !== 'undefined') {
+                window.ethers = ethers;
+                console.log('Ethers.js loaded successfully');
+            } else {
+                console.error('Failed to load ethers.js');
+            }
+        });
+
+        // Define global for browser compatibility
+        if (typeof global === 'undefined') {
+            window.global = window;
+        }
+    </script>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            color: #333;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+            overflow: hidden;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #2196F3 0%, #21CBF3 100%);
+            color: white;
+            padding: 40px;
+            text-align: center;
+        }
+
+        .header h1 {
+            margin: 0;
+            font-size: 2.5em;
+            font-weight: 300;
+            text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+        }
+
+        .header p {
+            margin: 10px 0 0 0;
+            opacity: 0.9;
+            font-size: 1.1em;
+        }
+
+        .content {
+            padding: 40px;
+        }
+
+        .tabs {
+            display: flex;
+            margin-bottom: 30px;
+            border-bottom: 2px solid #f0f0f0;
+        }
+
+        .tab {
+            padding: 15px 30px;
+            background: none;
+            border: none;
+            font-size: 16px;
+            cursor: pointer;
+            border-bottom: 3px solid transparent;
+            transition: all 0.3s;
+            color: #666;
+        }
+
+        .tab.active {
+            color: #2196F3;
+            border-bottom-color: #2196F3;
+        }
+
+        .tab-content {
+            display: none;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        .card {
+            background: white;
+            border-radius: 12px;
+            padding: 25px;
+            margin-bottom: 20px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.07);
+            border: 1px solid #f0f0f0;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 500;
+            color: #555;
+        }
+
+        .form-group input,
+        .form-group textarea,
+        .form-group select {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 16px;
+            transition: border-color 0.3s;
+            box-sizing: border-box;
+        }
+
+        .form-group input:focus,
+        .form-group textarea:focus,
+        .form-group select:focus {
+            outline: none;
+            border-color: #2196F3;
+        }
+
+        .btn {
+            background: linear-gradient(135deg, #2196F3, #21CBF3);
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 16px;
+            transition: transform 0.2s, box-shadow 0.2s;
+            margin-right: 10px;
+            margin-bottom: 10px;
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(33, 150, 243, 0.3);
+        }
+
+        .btn:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+        }
+
+        .btn-secondary {
+            background: linear-gradient(135deg, #6c757d, #868e96);
+        }
+
+        .btn-success {
+            background: linear-gradient(135deg, #28a745, #34ce57);
+        }
+
+        .btn-danger {
+            background: linear-gradient(135deg, #dc3545, #fd7e14);
+        }
+
+        .status {
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            font-weight: 500;
+        }
+
+        .status.success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+
+        .status.error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+
+        .status.info {
+            background: #d1ecf1;
+            color: #0c5460;
+            border: 1px solid #bee5eb;
+        }
+
+        .experiment-list {
+            display: grid;
+            gap: 20px;
+        }
+
+        .experiment-card {
+            background: white;
+            border-radius: 12px;
+            padding: 25px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.07);
+            border: 1px solid #f0f0f0;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+
+        .experiment-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.1);
+        }
+
+        .experiment-title {
+            font-size: 1.3em;
+            font-weight: 600;
+            margin-bottom: 10px;
+            color: #2196F3;
+        }
+
+        .experiment-meta {
+            display: flex;
+            gap: 20px;
+            margin-bottom: 15px;
+            font-size: 0.9em;
+            color: #666;
+        }
+
+        .experiment-actions {
+            display: flex;
+            gap: 10px;
+            margin-top: 15px;
+        }
+
+        .wallet-info {
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: white;
+            padding: 20px;
+            border-radius: 12px;
+            margin-bottom: 30px;
+            text-align: center;
+        }
+
+        .wallet-address {
+            font-family: monospace;
+            word-break: break-all;
+            margin-top: 10px;
+            opacity: 0.9;
+        }
+
+        .loading {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #2196F3;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-right: 10px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .hidden {
+            display: none !important;
+        }
+
+        .row {
+            display: flex;
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+
+        .col {
+            flex: 1;
+        }
+
+        @media (max-width: 768px) {
+            .container {
+                margin: 10px;
+                border-radius: 10px;
+            }
+
+            .header {
+                padding: 20px;
+            }
+
+            .header h1 {
+                font-size: 2em;
+            }
+
+            .content {
+                padding: 20px;
+            }
+
+            .tabs {
+                flex-wrap: wrap;
+            }
+
+            .tab {
+                padding: 10px 15px;
+                font-size: 14px;
+            }
+
+            .row {
+                flex-direction: column;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🔒 Privacy A/B Testing</h1>
+            <p>Anonymous testing with fully homomorphic encryption</p>
+        </div>
+
+        <div class="content">
+            <div id="walletSection" class="wallet-info">
+                <div id="connectWallet">
+                    <button class="btn" onclick="connectWallet()">Connect Wallet</button>
+                </div>
+                <div id="walletConnected" class="hidden">
+                    <div>Connected to: <span id="walletAddress" class="wallet-address"></span></div>
+                    <div>Network: <span id="networkName"></span></div>
+                </div>
+            </div>
+
+            <div class="tabs">
+                <button class="tab active" onclick="showTab('create')">Create Test</button>
+                <button class="tab" onclick="showTab('participate')">Participate</button>
+                <button class="tab" onclick="showTab('manage')">My Tests</button>
+                <button class="tab" onclick="showTab('results')">Results</button>
+            </div>
+
+            <!-- Create Experiment Tab -->
+            <div id="createTab" class="tab-content active">
+                <div class="card">
+                    <h3>Create New A/B Test</h3>
+                    <div class="form-group">
+                        <label for="experimentName">Test Name</label>
+                        <input type="text" id="experimentName" placeholder="e.g., Button Color Test">
+                    </div>
+                    <div class="form-group">
+                        <label for="experimentDescription">Description</label>
+                        <textarea id="experimentDescription" rows="3" placeholder="Describe what you're testing..."></textarea>
+                    </div>
+                    <div class="row">
+                        <div class="col">
+                            <div class="form-group">
+                                <label for="duration">Duration (hours)</label>
+                                <input type="number" id="duration" value="24" min="1">
+                            </div>
+                        </div>
+                    </div>
+                    <button class="btn" onclick="createExperiment()">
+                        <span id="createLoading" class="loading hidden"></span>
+                        Create Test
+                    </button>
+                </div>
+            </div>
+
+            <!-- Participate Tab -->
+            <div id="participateTab" class="tab-content">
+                <div class="card">
+                    <h3>Join A/B Test</h3>
+                    <div class="form-group">
+                        <label for="joinExperimentId">Test ID</label>
+                        <input type="number" id="joinExperimentId" placeholder="Enter test ID">
+                    </div>
+                    <div class="form-group">
+                        <label for="anonymousId">Anonymous ID</label>
+                        <input type="text" id="anonymousId" placeholder="Create a unique anonymous identifier">
+                        <small>This ID ensures anonymity while preventing duplicate participation</small>
+                    </div>
+                    <button class="btn" onclick="joinExperiment()">
+                        <span id="joinLoading" class="loading hidden"></span>
+                        Join Test
+                    </button>
+                </div>
+
+                <div class="card">
+                    <h3>Submit Test Data</h3>
+                    <div class="form-group">
+                        <label for="submitExperimentId">Test ID</label>
+                        <input type="number" id="submitExperimentId" placeholder="Enter test ID">
+                    </div>
+                    <div class="form-group">
+                        <label for="metricValue">Metric Value</label>
+                        <input type="number" id="metricValue" placeholder="e.g., conversion rate, clicks, etc.">
+                        <small>This value will be encrypted and contribute to the test results</small>
+                    </div>
+                    <button class="btn" onclick="submitData()">
+                        <span id="submitLoading" class="loading hidden"></span>
+                        Submit Data
+                    </button>
+                </div>
+            </div>
+
+            <!-- Manage Tab -->
+            <div id="manageTab" class="tab-content">
+                <div class="card">
+                    <h3>My A/B Tests</h3>
+                    <button class="btn btn-secondary" onclick="loadMyExperiments()">Refresh</button>
+                    <div id="myExperimentsList" class="experiment-list">
+                        <!-- Experiments will be loaded here -->
+                    </div>
+                </div>
+            </div>
+
+            <!-- Results Tab -->
+            <div id="resultsTab" class="tab-content">
+                <div class="card">
+                    <h3>Test Results</h3>
+                    <div class="form-group">
+                        <label for="resultsExperimentId">Test ID</label>
+                        <input type="number" id="resultsExperimentId" placeholder="Enter test ID">
+                    </div>
+                    <button class="btn" onclick="requestResults()">
+                        <span id="resultsLoading" class="loading hidden"></span>
+                        Request Results
+                    </button>
+                    <button class="btn btn-danger" onclick="endExperiment()">End Test</button>
+                </div>
+                <div id="resultsDisplay"></div>
+            </div>
+
+            <div id="status"></div>
+        </div>
+    </div>
+
+    <script>
+        // Contract configuration
+        const CONTRACT_ADDRESS = "0xf2DF4bd7851AB7a5084403d54850b93c56e196B7";
+        const CONTRACT_ABI = [
+            {
+                "inputs": [],
+                "stateMutability": "nonpayable",
+                "type": "constructor"
+            },
+            {
+                "anonymous": false,
+                "inputs": [
+                    {"indexed": true, "internalType": "uint32", "name": "experimentId", "type": "uint32"},
+                    {"indexed": false, "internalType": "bytes32", "name": "anonymousId", "type": "bytes32"}
+                ],
+                "name": "DataSubmitted",
+                "type": "event"
+            },
+            {
+                "anonymous": false,
+                "inputs": [
+                    {"indexed": true, "internalType": "uint32", "name": "experimentId", "type": "uint32"},
+                    {"indexed": false, "internalType": "string", "name": "name", "type": "string"},
+                    {"indexed": false, "internalType": "address", "name": "creator", "type": "address"}
+                ],
+                "name": "ExperimentCreated",
+                "type": "event"
+            },
+            {
+                "anonymous": false,
+                "inputs": [
+                    {"indexed": true, "internalType": "uint32", "name": "experimentId", "type": "uint32"}
+                ],
+                "name": "ExperimentEnded",
+                "type": "event"
+            },
+            {
+                "anonymous": false,
+                "inputs": [
+                    {"indexed": true, "internalType": "uint32", "name": "experimentId", "type": "uint32"},
+                    {"indexed": false, "internalType": "bytes32", "name": "anonymousId", "type": "bytes32"},
+                    {"indexed": false, "internalType": "uint8", "name": "group", "type": "uint8"}
+                ],
+                "name": "ParticipantJoined",
+                "type": "event"
+            },
+            {
+                "inputs": [],
+                "name": "currentExperimentId",
+                "outputs": [{"internalType": "uint32", "name": "", "type": "uint32"}],
+                "stateMutability": "view",
+                "type": "function"
+            },
+            {
+                "inputs": [
+                    {"internalType": "string", "name": "_name", "type": "string"},
+                    {"internalType": "string", "name": "_description", "type": "string"},
+                    {"internalType": "uint256", "name": "_duration", "type": "uint256"}
+                ],
+                "name": "createExperiment",
+                "outputs": [{"internalType": "uint32", "name": "", "type": "uint32"}],
+                "stateMutability": "nonpayable",
+                "type": "function"
+            },
+            {
+                "inputs": [{"internalType": "uint32", "name": "_experimentId", "type": "uint32"}],
+                "name": "endExperiment",
+                "outputs": [],
+                "stateMutability": "nonpayable",
+                "type": "function"
+            },
+            {
+                "inputs": [
+                    {"internalType": "uint32", "name": "", "type": "uint32"}
+                ],
+                "name": "experiments",
+                "outputs": [
+                    {"internalType": "string", "name": "name", "type": "string"},
+                    {"internalType": "string", "name": "description", "type": "string"},
+                    {"internalType": "uint256", "name": "startTime", "type": "uint256"},
+                    {"internalType": "uint256", "name": "endTime", "type": "uint256"},
+                    {"internalType": "bool", "name": "isActive", "type": "bool"},
+                    {"internalType": "uint32", "name": "totalParticipants", "type": "uint32"},
+                    {"internalType": "uint32", "name": "groupACount", "type": "uint32"},
+                    {"internalType": "uint32", "name": "groupBCount", "type": "uint32"},
+                    {"internalType": "euint32", "name": "encryptedMetricSum", "type": "uint256"},
+                    {"internalType": "address", "name": "creator", "type": "address"}
+                ],
+                "stateMutability": "view",
+                "type": "function"
+            },
+            {
+                "inputs": [],
+                "name": "getCurrentExperimentId",
+                "outputs": [{"internalType": "uint32", "name": "", "type": "uint32"}],
+                "stateMutability": "view",
+                "type": "function"
+            },
+            {
+                "inputs": [{"internalType": "uint32", "name": "_experimentId", "type": "uint32"}],
+                "name": "getExperimentInfo",
+                "outputs": [
+                    {"internalType": "string", "name": "name", "type": "string"},
+                    {"internalType": "string", "name": "description", "type": "string"},
+                    {"internalType": "uint256", "name": "startTime", "type": "uint256"},
+                    {"internalType": "uint256", "name": "endTime", "type": "uint256"},
+                    {"internalType": "bool", "name": "isActive", "type": "bool"},
+                    {"internalType": "uint32", "name": "totalParticipants", "type": "uint32"},
+                    {"internalType": "address", "name": "creator", "type": "address"}
+                ],
+                "stateMutability": "view",
+                "type": "function"
+            },
+            {
+                "inputs": [{"internalType": "uint32", "name": "_experimentId", "type": "uint32"}],
+                "name": "getMyGroup",
+                "outputs": [{"internalType": "bytes32", "name": "", "type": "bytes32"}],
+                "stateMutability": "view",
+                "type": "function"
+            },
+            {
+                "inputs": [
+                    {"internalType": "uint32", "name": "_experimentId", "type": "uint32"},
+                    {"internalType": "address", "name": "_participant", "type": "address"}
+                ],
+                "name": "getParticipantStatus",
+                "outputs": [
+                    {"internalType": "bool", "name": "hasJoined", "type": "bool"},
+                    {"internalType": "bool", "name": "hasSubmittedData", "type": "bool"},
+                    {"internalType": "uint256", "name": "joinTime", "type": "uint256"}
+                ],
+                "stateMutability": "view",
+                "type": "function"
+            },
+            {
+                "inputs": [{"internalType": "address", "name": "_user", "type": "address"}],
+                "name": "getUserExperiments",
+                "outputs": [{"internalType": "uint32[]", "name": "", "type": "uint32[]"}],
+                "stateMutability": "view",
+                "type": "function"
+            },
+            {
+                "inputs": [
+                    {"internalType": "uint32", "name": "_experimentId", "type": "uint32"},
+                    {"internalType": "bytes32", "name": "_anonymousId", "type": "bytes32"}
+                ],
+                "name": "isAnonymousIdAvailable",
+                "outputs": [{"internalType": "bool", "name": "", "type": "bool"}],
+                "stateMutability": "view",
+                "type": "function"
+            },
+            {
+                "inputs": [
+                    {"internalType": "uint32", "name": "_experimentId", "type": "uint32"},
+                    {"internalType": "bytes32", "name": "_anonymousId", "type": "bytes32"}
+                ],
+                "name": "joinExperiment",
+                "outputs": [],
+                "stateMutability": "nonpayable",
+                "type": "function"
+            },
+            {
+                "inputs": [],
+                "name": "owner",
+                "outputs": [{"internalType": "address", "name": "", "type": "address"}],
+                "stateMutability": "view",
+                "type": "function"
+            },
+            {
+                "inputs": [
+                    {"internalType": "uint256", "name": "requestId", "type": "uint256"},
+                    {"internalType": "uint32", "name": "totalSum", "type": "uint32"},
+                    {"internalType": "bytes", "name": "signatures", "type": "bytes"}
+                ],
+                "name": "processResults",
+                "outputs": [],
+                "stateMutability": "nonpayable",
+                "type": "function"
+            },
+            {
+                "inputs": [{"internalType": "uint32", "name": "_experimentId", "type": "uint32"}],
+                "name": "requestResults",
+                "outputs": [],
+                "stateMutability": "nonpayable",
+                "type": "function"
+            },
+            {
+                "inputs": [
+                    {"internalType": "uint32", "name": "_experimentId", "type": "uint32"},
+                    {"internalType": "uint32", "name": "_metricValue", "type": "uint32"}
+                ],
+                "name": "submitData",
+                "outputs": [],
+                "stateMutability": "nonpayable",
+                "type": "function"
+            }
+        ];
+
+        let provider;
+        let signer;
+        let contract;
+        let fhevmInstance;
+
+        // Sepolia network configuration
+        const SEPOLIA_NETWORK = {
+            chainId: '0xaa36a7',
+            chainName: 'Sepolia Test Network',
+            rpcUrls: ['https://sepolia.infura.io/v3/'],
+            nativeCurrency: {
+                name: 'Sepolia Ether',
+                symbol: 'SEP',
+                decimals: 18
+            },
+            blockExplorerUrls: ['https://sepolia.etherscan.io/']
+        };
+
+        // Initialize the application
+        async function init() {
+            try {
+                if (typeof window.ethereum !== 'undefined') {
+                    provider = new window.ethers.providers.Web3Provider(window.ethereum);
+
+                    // Check if already connected
+                    const accounts = await provider.listAccounts();
+                    if (accounts.length > 0) {
+                        await validateAndSwitchNetwork();
+                        await updateWalletInfo();
+                    }
+                } else {
+                    showStatus('Please install MetaMask to use this application', 'error');
+                }
+            } catch (error) {
+                console.error('Initialization error:', error);
+                showStatus('Initialization failed: ' + error.message, 'error');
+            }
+        }
+
+        // Validate and switch to Sepolia network
+        async function validateAndSwitchNetwork() {
+            try {
+                const chainId = await window.ethereum.request({ method: 'eth_chainId' });
+
+                if (chainId !== SEPOLIA_NETWORK.chainId) {
+                    try {
+                        // Try to switch to Sepolia
+                        await window.ethereum.request({
+                            method: 'wallet_switchEthereumChain',
+                            params: [{ chainId: SEPOLIA_NETWORK.chainId }],
+                        });
+                    } catch (switchError) {
+                        // If network doesn't exist, add it
+                        if (switchError.code === 4902) {
+                            await window.ethereum.request({
+                                method: 'wallet_addEthereumChain',
+                                params: [SEPOLIA_NETWORK],
+                            });
+                        } else {
+                            throw switchError;
+                        }
+                    }
+                }
+                return true;
+            } catch (error) {
+                console.error('Network switch error:', error);
+                showStatus('Please switch to Sepolia network manually', 'error');
+                return false;
+            }
+        }
+
+        // Connect wallet
+        async function connectWallet() {
+            try {
+                // Step 1: Check ethers.js availability
+                if (typeof window.ethers === 'undefined') {
+                    showStatus('Ethers.js library not loaded. Please refresh the page.', 'error');
+                    return;
+                }
+
+                // Step 2: Check MetaMask availability
+                if (typeof window.ethereum === 'undefined') {
+                    showStatus('Please install MetaMask to continue', 'error');
+                    return;
+                }
+
+                // Step 3: Request account access
+                await window.ethereum.request({ method: 'eth_requestAccounts' });
+                provider = new window.ethers.providers.Web3Provider(window.ethereum);
+                signer = provider.getSigner();
+
+                // Step 4: Validate and switch to Sepolia network
+                const networkSwitched = await validateAndSwitchNetwork();
+                if (!networkSwitched) {
+                    return;
+                }
+
+                // Step 5: Verify connection to Sepolia
+                const network = await provider.getNetwork();
+                if (network.chainId !== 11155111) { // Sepolia chain ID in decimal
+                    showStatus('Please connect to Sepolia testnet', 'error');
+                    return;
+                }
+
+                // Step 6: Initialize FHEVM (optional)
+                try {
+                    if (typeof fhevm !== 'undefined') {
+                        fhevmInstance = await fhevm.createInstance({
+                            chainId: parseInt(await window.ethereum.request({ method: 'eth_chainId' }), 16),
+                            provider: window.ethereum
+                        });
+                    }
+                } catch (fhevmError) {
+                    console.warn('FHEVM initialization failed:', fhevmError);
+                    // Continue without FHEVM for basic functionality
+                }
+
+                // Step 7: Create contract instance
+                contract = new window.ethers.Contract(CONTRACT_ADDRESS, CONTRACT_ABI, signer);
+
+                // Step 8: Update UI state
+                await updateWalletInfo();
+                showStatus('Connected to Sepolia successfully! ✅', 'success');
+
+            } catch (error) {
+                console.error('Connection error:', error);
+                if (error.code === 4001) {
+                    showStatus('Connection rejected by user', 'error');
+                } else if (error.code === -32002) {
+                    showStatus('Connection request already pending', 'info');
+                } else {
+                    showStatus('Failed to connect wallet: ' + error.message, 'error');
+                }
+            }
+        }
+
+        // Update wallet information
+        async function updateWalletInfo() {
+            try {
+                const address = await signer.getAddress();
+                const network = await provider.getNetwork();
+
+                document.getElementById('walletAddress').textContent =
+                    address.substring(0, 6) + '...' + address.substring(38);
+
+                // Display network name
+                let networkDisplayName = network.name;
+                if (network.chainId === 11155111) {
+                    networkDisplayName = 'Sepolia Testnet';
+                }
+                document.getElementById('networkName').textContent = networkDisplayName;
+
+                document.getElementById('connectWallet').classList.add('hidden');
+                document.getElementById('walletConnected').classList.remove('hidden');
+            } catch (error) {
+                console.error('Error updating wallet info:', error);
+                showStatus('Failed to update wallet information', 'error');
+            }
+        }
+
+        // Create new experiment
+        async function createExperiment() {
+            try {
+                if (!contract) {
+                    showStatus('Please connect your wallet first', 'error');
+                    return;
+                }
+
+                const name = document.getElementById('experimentName').value;
+                const description = document.getElementById('experimentDescription').value;
+                const duration = parseInt(document.getElementById('duration').value) * 3600; // Convert to seconds
+
+                if (!name || !description) {
+                    showStatus('Please fill in all fields', 'error');
+                    return;
+                }
+
+                document.getElementById('createLoading').classList.remove('hidden');
+
+                const tx = await contract.createExperiment(name, description, duration);
+                await tx.wait();
+
+                showStatus('Test created successfully!', 'success');
+
+                // Clear form
+                document.getElementById('experimentName').value = '';
+                document.getElementById('experimentDescription').value = '';
+                document.getElementById('duration').value = '24';
+
+            } catch (error) {
+                console.error('Create experiment error:', error);
+                showStatus('Failed to create test: ' + error.message, 'error');
+            } finally {
+                document.getElementById('createLoading').classList.add('hidden');
+            }
+        }
+
+        // Join experiment
+        async function joinExperiment() {
+            try {
+                if (!contract) {
+                    showStatus('Please connect your wallet first', 'error');
+                    return;
+                }
+
+                const experimentId = parseInt(document.getElementById('joinExperimentId').value);
+                const anonymousId = document.getElementById('anonymousId').value;
+
+                if (!experimentId || !anonymousId) {
+                    showStatus('Please fill in all fields', 'error');
+                    return;
+                }
+
+                // Convert anonymous ID to bytes32
+                const anonymousIdBytes32 = window.ethers.utils.formatBytes32String(anonymousId);
+
+                document.getElementById('joinLoading').classList.remove('hidden');
+
+                const tx = await contract.joinExperiment(experimentId, anonymousIdBytes32);
+                await tx.wait();
+
+                showStatus('Joined test successfully!', 'success');
+
+            } catch (error) {
+                console.error('Join experiment error:', error);
+                showStatus('Failed to join test: ' + error.message, 'error');
+            } finally {
+                document.getElementById('joinLoading').classList.add('hidden');
+            }
+        }
+
+        // Submit data
+        async function submitData() {
+            try {
+                if (!contract || !fhevmInstance) {
+                    showStatus('Please connect your wallet first', 'error');
+                    return;
+                }
+
+                const experimentId = parseInt(document.getElementById('submitExperimentId').value);
+                const metricValue = parseInt(document.getElementById('metricValue').value);
+
+                if (!experimentId || metricValue === undefined) {
+                    showStatus('Please fill in all fields', 'error');
+                    return;
+                }
+
+                document.getElementById('submitLoading').classList.remove('hidden');
+
+                const tx = await contract.submitData(experimentId, metricValue);
+                await tx.wait();
+
+                showStatus('Data submitted successfully!', 'success');
+
+            } catch (error) {
+                console.error('Submit data error:', error);
+                showStatus('Failed to submit data: ' + error.message, 'error');
+            } finally {
+                document.getElementById('submitLoading').classList.add('hidden');
+            }
+        }
+
+        // Load my experiments
+        async function loadMyExperiments() {
+            try {
+                if (!contract) {
+                    showStatus('Please connect your wallet first', 'error');
+                    return;
+                }
+
+                const address = await signer.getAddress();
+                const experimentIds = await contract.getUserExperiments(address);
+
+                const experimentsList = document.getElementById('myExperimentsList');
+                experimentsList.innerHTML = '';
+
+                if (experimentIds.length === 0) {
+                    experimentsList.innerHTML = '<p>No tests created yet.</p>';
+                    return;
+                }
+
+                for (const id of experimentIds) {
+                    const info = await contract.getExperimentInfo(id);
+
+                    const experimentCard = document.createElement('div');
+                    experimentCard.className = 'experiment-card';
+                    experimentCard.innerHTML = `
+                        <div class="experiment-title">${info.name}</div>
+                        <div class="experiment-meta">
+                            <span>ID: ${id}</span>
+                            <span>Participants: ${info.totalParticipants}</span>
+                            <span>Status: ${info.isActive ? 'Active' : 'Ended'}</span>
+                        </div>
+                        <p>${info.description}</p>
+                        <div class="experiment-actions">
+                            <button class="btn btn-secondary" onclick="viewExperiment(${id})">View Details</button>
+                            ${info.isActive ?
+                                `<button class="btn btn-danger" onclick="endExperimentById(${id})">End Test</button>` :
+                                `<button class="btn" onclick="getResults(${id})">Get Results</button>`
+                            }
+                        </div>
+                    `;
+
+                    experimentsList.appendChild(experimentCard);
+                }
+
+            } catch (error) {
+                console.error('Load experiments error:', error);
+                showStatus('Failed to load tests: ' + error.message, 'error');
+            }
+        }
+
+        // End experiment
+        async function endExperiment() {
+            const experimentId = parseInt(document.getElementById('resultsExperimentId').value);
+            if (!experimentId) {
+                showStatus('Please enter a test ID', 'error');
+                return;
+            }
+            await endExperimentById(experimentId);
+        }
+
+        async function endExperimentById(experimentId) {
+            try {
+                if (!contract) {
+                    showStatus('Please connect your wallet first', 'error');
+                    return;
+                }
+
+                const tx = await contract.endExperiment(experimentId);
+                await tx.wait();
+
+                showStatus('Test ended successfully!', 'success');
+                loadMyExperiments(); // Refresh the list
+
+            } catch (error) {
+                console.error('End experiment error:', error);
+                showStatus('Failed to end test: ' + error.message, 'error');
+            }
+        }
+
+        // Request results
+        async function requestResults() {
+            try {
+                if (!contract) {
+                    showStatus('Please connect your wallet first', 'error');
+                    return;
+                }
+
+                const experimentId = parseInt(document.getElementById('resultsExperimentId').value);
+
+                if (!experimentId) {
+                    showStatus('Please enter a test ID', 'error');
+                    return;
+                }
+
+                document.getElementById('resultsLoading').classList.remove('hidden');
+
+                const tx = await contract.requestResults(experimentId);
+                await tx.wait();
+
+                showStatus('Results requested successfully! Check back in a few minutes.', 'success');
+
+            } catch (error) {
+                console.error('Request results error:', error);
+                showStatus('Failed to request results: ' + error.message, 'error');
+            } finally {
+                document.getElementById('resultsLoading').classList.add('hidden');
+            }
+        }
+
+        // Show tab
+        function showTab(tabName) {
+            // Hide all tabs
+            const tabs = document.querySelectorAll('.tab-content');
+            tabs.forEach(tab => tab.classList.remove('active'));
+
+            const tabButtons = document.querySelectorAll('.tab');
+            tabButtons.forEach(button => button.classList.remove('active'));
+
+            // Show selected tab
+            document.getElementById(tabName + 'Tab').classList.add('active');
+            event.target.classList.add('active');
+        }
+
+        // Show status message
+        function showStatus(message, type) {
+            const statusDiv = document.getElementById('status');
+            statusDiv.innerHTML = `<div class="status ${type}">${message}</div>`;
+
+            // Auto-hide after 5 seconds
+            setTimeout(() => {
+                statusDiv.innerHTML = '';
+            }, 5000);
+        }
+
+        // Initialize when page loads
+        window.addEventListener('load', () => {
+            // Wait a bit for all scripts to load
+            setTimeout(() => {
+                if (typeof window.ethers === 'undefined') {
+                    console.error('Ethers.js not loaded');
+                    showStatus('Failed to load required libraries. Please refresh the page.', 'error');
+                    return;
+                }
+                console.log('Initializing application...');
+                init();
+            }, 100);
+        });
+
+        // Handle account changes
+        if (window.ethereum) {
+            window.ethereum.on('accountsChanged', (accounts) => {
+                if (accounts.length === 0) {
+                    // User disconnected
+                    document.getElementById('connectWallet').classList.remove('hidden');
+                    document.getElementById('walletConnected').classList.add('hidden');
+                    showStatus('Wallet disconnected', 'info');
+                } else {
+                    // User switched accounts
+                    connectWallet(); // Reconnect with new account
+                }
+            });
+
+            window.ethereum.on('chainChanged', (chainId) => {
+                // Check if switched to Sepolia, otherwise reload
+                if (chainId === SEPOLIA_NETWORK.chainId) {
+                    showStatus('Switched to Sepolia network', 'success');
+                    window.location.reload();
+                } else {
+                    showStatus('Please switch to Sepolia network', 'error');
+                    window.location.reload();
+                }
+            });
+        }
+    </script>
+</body>
+</html>
